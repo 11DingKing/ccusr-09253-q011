@@ -52,6 +52,9 @@ class CheckinRecord:
     start_utc: datetime
     end_utc: datetime
     status: CheckinStatus
+    location: str | None = None
+    mentor_comment: str | None = None
+    confirmed_by: str | None = None
 
     @property
     def seconds(self) -> int:
@@ -117,6 +120,7 @@ def _parse_checkin(
         start_utc=start,
         end_utc=end,
         status=status,
+        location=event.payload.get("location"),
     )
 
 
@@ -150,6 +154,12 @@ def replay(
             target = checkin_index.get(target_id)
             if target is not None and target.student_id == event.student_id:
                 target.status = CheckinStatus.CONFIRMED
+                comment = event.payload.get("comment")
+                if comment is not None:
+                    target.mentor_comment = str(comment)
+                mentor_id = event.payload.get("mentor_id")
+                if mentor_id is not None:
+                    target.confirmed_by = str(mentor_id)
         elif event.event_type == EventType.LEAVE_CORRECTION:
             seconds = int(event.payload.get("adjustment_seconds", 0))
             adjustments_by_student.setdefault(event.student_id, []).append(
@@ -228,6 +238,9 @@ def explain_checkin(record: CheckinRecord, tz_name: str) -> dict[str, Any]:
         "activity_type": record.activity_type,
         "status": record.status.value,
         "counts": record.counts,
+        "location": record.location,
+        "mentor_comment": record.mentor_comment,
+        "confirmed_by": record.confirmed_by,
         "check_in_at_utc": record.start_utc.astimezone(timezone.utc)
         .isoformat()
         .replace("+00:00", "Z"),

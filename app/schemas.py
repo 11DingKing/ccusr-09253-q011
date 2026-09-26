@@ -88,6 +88,9 @@ class CheckinExplanation(BaseModel):
     activity_type: str
     status: str
     counts: bool
+    location: str | None = None
+    mentor_comment: str | None = None
+    confirmed_by: str | None = None
     check_in_at_utc: str
     check_out_at_utc: str
     raw_seconds: int
@@ -97,7 +100,7 @@ class CheckinExplanation(BaseModel):
 class AdjustmentOut(BaseModel):
     event_id: str
     seconds: int
-    reason: str
+    reason: str | None = None
 
 
 class StudentProgressOut(BaseModel):
@@ -112,6 +115,7 @@ class StudentProgressOut(BaseModel):
     daily: list[DailyTotal]
     checkins: list[CheckinExplanation]
     adjustments: list[AdjustmentOut]
+    redacted_fields: list[str] = Field(default_factory=list)
 
 
 class SnapshotOut(BaseModel):
@@ -138,3 +142,118 @@ class DiffOut(BaseModel):
     new_event_cutoff_id: str | None
     student_changes: list[dict[str, Any]]
     students_affected: int
+
+
+# ---------------------------------------------------------------------------
+# 隐私字段分级访问
+# ---------------------------------------------------------------------------
+
+
+class ActorIn(BaseModel):
+    role: Literal["counselor", "mentor", "auditor", "grant_admin"]
+    institution_id: str = Field(..., min_length=1, max_length=128)
+
+
+class ActorOut(BaseModel):
+    actor_id: str
+    role: str
+    institution_id: str
+
+
+class EnrollmentIn(BaseModel):
+    institution_id: str = Field(..., min_length=1, max_length=128)
+
+
+class EnrollmentOut(BaseModel):
+    student_id: str
+    plan_version: str
+    institution_id: str
+
+
+class MentorAssignmentIn(BaseModel):
+    active: bool = True
+
+
+class MentorAssignmentOut(BaseModel):
+    mentor_id: str
+    student_id: str
+    active: bool
+
+
+class GrantIn(BaseModel):
+    grant_id: str = Field(..., min_length=1, max_length=128)
+    actor_id: str = Field(..., min_length=1, max_length=128)
+    scope_type: Literal["institution", "plan", "student"]
+    scope_value: str = Field(..., min_length=1, max_length=128)
+    fields: list[str] = Field(..., min_length=1)
+    delegated_by: str | None = None
+    expires_at: datetime | None = None
+    reason: str = ""
+
+
+class GrantRevokeIn(BaseModel):
+    reason: str = ""
+
+
+class GrantOut(BaseModel):
+    grant_id: str
+    actor_id: str
+    scope_type: str
+    scope_value: str
+    fields: list[str]
+    delegated_by: str | None
+    status: str
+    expires_at: str | None
+    created_at: str | None
+    revoked_at: str | None
+
+
+class GrantEventOut(BaseModel):
+    grant_id: str
+    action: str
+    actor_id: str
+    reason: str
+    occurred_at: str | None
+
+
+class SimulateIn(BaseModel):
+    actor_id: str = Field(..., min_length=1, max_length=128)
+    plan_version: str = Field(..., min_length=1, max_length=128)
+    student_id: str = Field(..., min_length=1, max_length=128)
+
+
+class DecisionOut(BaseModel):
+    actor_id: str
+    student_id: str
+    plan_version: str
+    allowed: bool
+    visible_fields: list[str]
+    redacted_fields: list[str]
+    sources: list[str]
+    reason: str
+
+
+class AccessLogOut(BaseModel):
+    id: int
+    actor_id: str
+    action: str
+    plan_version: str
+    student_id: str
+    freeze_id: str | None
+    decision: str
+    visible_fields: list[str]
+    redacted_fields: list[str]
+    occurred_at: str | None
+
+
+class ExportIn(BaseModel):
+    student_ids: list[str] | None = None
+    freeze_id: str | None = None
+
+
+class ExportOut(BaseModel):
+    plan_version: str
+    freeze_id: str | None
+    generated_at: str
+    exported_count: int
+    students: list[dict[str, Any]]
