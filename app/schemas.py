@@ -25,6 +25,7 @@ class CheckinPayload(BaseModel):
     activity_type: str = "regular"
     check_in_at: datetime
     check_out_at: datetime
+    location: str = ""
 
     @model_validator(mode="after")
     def _check_order(self) -> "CheckinPayload":
@@ -42,6 +43,7 @@ class CheckinPayload(BaseModel):
 
 class MentorConfirmPayload(BaseModel):
     checkin_event_id: str
+    comment: str = ""
 
 
 class LeaveCorrectionPayload(BaseModel):
@@ -88,6 +90,8 @@ class CheckinExplanation(BaseModel):
     activity_type: str
     status: str
     counts: bool
+    location: str = ""
+    mentor_comment: str = ""
     check_in_at_utc: str
     check_out_at_utc: str
     raw_seconds: int
@@ -138,3 +142,114 @@ class DiffOut(BaseModel):
     new_event_cutoff_id: str | None
     student_changes: list[dict[str, Any]]
     students_affected: int
+
+
+Role = Literal["counselor", "mentor", "auditor"]
+SensitiveField = Literal["location", "reason", "mentor_comment"]
+
+
+class SubjectIn(BaseModel):
+    subject_id: str = Field(..., min_length=1, max_length=128)
+    org_id: str = Field(..., min_length=1, max_length=128)
+    role: Role
+    is_active: bool = True
+
+
+class SubjectOut(BaseModel):
+    subject_id: str
+    org_id: str
+    role: str
+    is_active: bool
+
+
+class EnrollmentIn(BaseModel):
+    student_id: str = Field(..., min_length=1, max_length=128)
+    org_id: str = Field(..., min_length=1, max_length=128)
+
+
+class EnrollmentOut(BaseModel):
+    student_id: str
+    org_id: str
+
+
+class MentorRelationIn(BaseModel):
+    mentor_id: str = Field(..., min_length=1, max_length=128)
+    student_id: str = Field(..., min_length=1, max_length=128)
+
+
+class MentorRelationOut(BaseModel):
+    mentor_id: str
+    student_id: str
+    plan_version: str
+    is_active: bool
+
+
+class GrantIn(BaseModel):
+    subject_id: str = Field(..., min_length=1, max_length=128)
+    fields: list[SensitiveField] = Field(default_factory=list)
+    student_id: str | None = Field(None, min_length=1, max_length=128)
+    is_delegation: bool = False
+    granted_by: str | None = Field(None, min_length=1, max_length=128)
+    expires_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def _delegation_requires_actor(self) -> "GrantIn":
+        if self.is_delegation and not self.granted_by:
+            raise ValueError("delegation requires granted_by")
+        return self
+
+
+class GrantOut(BaseModel):
+    grant_id: str
+    subject_id: str
+    plan_version: str | None
+    student_id: str | None
+    fields: list[str]
+    is_delegation: bool
+    granted_by: str | None
+    is_revoked: bool
+    expires_at: datetime | None
+    created_at: datetime
+    revoked_at: datetime | None
+
+
+class GrantRevokeIn(BaseModel):
+    actor_id: str = Field(..., min_length=1, max_length=128)
+    reason: str = Field(..., min_length=1, max_length=512)
+
+
+class SimulateIn(BaseModel):
+    subject_id: str = Field(..., min_length=1, max_length=128)
+    plan_version: str = Field(..., min_length=1, max_length=128)
+    student_id: str = Field(..., min_length=1, max_length=128)
+
+
+class SimulateOut(BaseModel):
+    subject_id: str
+    role: str
+    org_id: str
+    plan_version: str
+    student_id: str
+    decision: Literal["allow", "deny"]
+    visible_fields: list[str]
+    redacted_fields: list[str]
+    reasons: list[str]
+
+
+class AccessAuditOut(BaseModel):
+    id: int
+    occurred_at: datetime
+    subject_id: str
+    action: str
+    plan_version: str
+    student_id: str | None
+    resource: str
+    decision: str
+    visible_fields: list[str]
+    redacted_fields: list[str]
+    detail: str
+
+
+class ExportRequest(BaseModel):
+    subject_id: str = Field(..., min_length=1, max_length=128)
+    student_ids: list[str] = Field(default_factory=list)

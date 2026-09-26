@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.access.policy import get_policy_store
 from app.db import get_db
 from app.main import app
 from app.models import Base
@@ -19,8 +20,10 @@ TestSessionLocal = sessionmaker(bind=test_engine, autoflush=False, autocommit=Fa
 @pytest.fixture(autouse=True)
 def _schema() -> Iterator[None]:
     Base.metadata.create_all(test_engine)
+    get_policy_store().invalidate()
     yield
     Base.metadata.drop_all(test_engine)
+    get_policy_store().invalidate()
 
 @pytest.fixture
 def db() -> Iterator[Session]:
